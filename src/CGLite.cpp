@@ -253,11 +253,6 @@ std::unordered_map<Link, std::unordered_map<TimePeriod, double>> TT; // Travel t
 std::unordered_map<Zone, std::unordered_map<Zone, std::unordered_map<Mode, std::unordered_map<TimePeriod, double>>>> TT_OD; // Travel time for OD
 // Note: LP is not explicitly initialized here, assuming it's calculated as part of model functions.
 
-// Function to calculate link volume and travel time from demand
-void calculateLinkVolumeAndTravelTime() {
-    // Implementation goes here
-}
-
 // Function to compute path travel time
 void computePathTravelTime() {
     // Implementation goes here
@@ -268,8 +263,67 @@ void determineODPairTravelTime() {
     // Implementation goes here
 }
 
-// Define more functions as needed for constraints and conversion equations
-// ...
+// Assuming that the types and data structures for TT, LP, D, and V are defined as follows:
+using Zone = int;
+using Mode = std::string;
+using TimePeriod = std::string;
+using Link = int;
+using PathIndex = int;
+
+// Travel time for each path
+std::unordered_map<PathIndex, std::unordered_map<TimePeriod, double>> TT;
+
+// Link proportion matrix
+std::unordered_map<Zone, std::unordered_map<Zone, std::unordered_map<Mode, std::unordered_map<TimePeriod, std::unordered_map<PathIndex, std::unordered_map<Link, double>>>>>> LP;
+
+// OD demand
+std::unordered_map<Zone, std::unordered_map<Zone, std::unordered_map<Mode, std::unordered_map<TimePeriod, double>>>> D;
+
+// Volume for each link
+std::unordered_map<Link, std::unordered_map<TimePeriod, double>> V;
+
+// Function to compute the link volumes based on the conservation of flow
+void computeLinkVolumes() {
+    // Iterate over each time period
+    for (const auto& time_period_pair : TT) {
+        const TimePeriod& tau = time_period_pair.first;
+
+        // Reset volumes for the new time period
+        for (auto& link_volume_pair : V) {
+            link_volume_pair.second[tau] = 0.0;
+        }
+
+        // Iterate over all origins
+        for (const auto& origin_pair : LP) {
+            Zone o = origin_pair.first;
+
+            // Iterate over all destinations
+            for (const auto& destination_pair : origin_pair.second) {
+                Zone d = destination_pair.first;
+
+                // Iterate over all modes
+                for (const auto& mode_pair : destination_pair.second) {
+                    Mode m = mode_pair.first;
+
+                    // Iterate over all paths for this OD pair and mode
+                    for (const auto& path_pair : mode_pair.second[tau]) {
+                        PathIndex p = path_pair.first;
+                        double path_travel_time = TT[p][tau]; // Get the travel time for this path
+
+                        // Iterate over all links in this path
+                        for (const auto& link_proportion_pair : path_pair.second) {
+                            Link l = link_proportion_pair.first;
+                            double proportion = link_proportion_pair.second;
+
+                            // Add the flow contribution to this link
+                            V[l][tau] += path_travel_time * proportion;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 int main() {
     // Initialize your parameters and variables
@@ -279,7 +333,7 @@ int main() {
     Cap[1] = 50; // Capacity of link 1
 
     // Call your model functions
-    calculateLinkVolumeAndTravelTime();
+    computeLinkVolumes(); 
     computePathTravelTime();
     determineODPairTravelTime();
 
